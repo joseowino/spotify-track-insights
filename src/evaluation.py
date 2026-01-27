@@ -12,7 +12,7 @@ Functions:
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
-
+from math import sqrt
 
 # ==============================
 # Metrics
