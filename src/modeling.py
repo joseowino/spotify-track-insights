@@ -14,6 +14,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 import joblib
 import os
+from math import sqrt
 
 # ==============================
 # Configuration
@@ -60,8 +61,9 @@ def train_linear_regression(
     y_pred = model.predict(X_test)
 
     r2 = r2_score(y_test, y_pred)
-    rmse = mean_squared_error(y_test, y_pred, squared=False)
-    print(f"[INFO] Linear Regression trained: R²={r2:.4f}, RMSE={rmse:.4f}")
+
+    mse = mean_squared_error(y_test, y_pred)
+    rmse = sqrt(mse)
 
     if save_model:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
