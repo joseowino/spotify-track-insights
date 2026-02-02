@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Spotify Tracks Linear Regression Analysis</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1DB954;
+            border-bottom: 3px solid #1DB954;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2c3e50;
+            margin-top: 30px;
+            border-left: 4px solid #1DB954;
+            padding-left: 15px;
+        }
+        h3 {
+            color: #34495e;
+        }
+        .cell {
+            margin: 20px 0;
+            border-left: 3px solid #ecf0f1;
+            padding-left: 15px;
+        }
+        .cell-markdown {
+            color: #2c3e50;
+        }
+        .cell-code {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 3px solid #3498db;
+            overflow-x: auto;
+        }
+        pre {
+            margin: 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+        }
+        code {
+            background-color: #f1f3f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+        .output {
+            background-color: #ffffff;
+            border: 1px solid #e1e4e8;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 3px;
+        }
+        strong {
+            color: #1DB954;
+        }
+        ul, ol {
+            margin-left: 20px;
+        }
+        .note {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 10px 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #1DB954;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        a {
+            color: #1DB954;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+<div class="cell cell-markdown">
+<ul>
+<h1>Spotify Tracks Linear Regression Analysis</h1></li>
+</li>
+#<h1>Project Overview</li>
+This notebook performs linear regression modeling on the Spotify Tracks Dataset to predict track popularity based on various audio features and metadata.</li>
+</li>
+<strong>Dataset<strong>: [Spotify Tracks Dataset](https://www.kaggle.com/datasets/maharshipandya/-spotify-tracks-dataset/data)</li>
+</li>
+<strong>Features Used<strong>:</li>
+<li>Audio Features: Danceability, Energy, Valence, Tempo, Loudness, Duration_min</li>
+<li>Metadata: Explicit</li>
+</li>
+<strong>Target Variable<strong>: Popularity (0-100 score)</ul>
+</div>
+<div class="cell cell-markdown">
+<h2>1. Import Libraries</div>
+<div class="cell cell-code">
+<pre><code># Data manipulation
+import pandas as pd
+import numpy as np
+
+# Visualization
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Machine Learning
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+
+# Suppress warnings
+import warnings
+warnings.filterwarnings('ignore')
+
+# Set visualization style
+sns.set_style('whitegrid')
+plt.rcParams['figure.figsize'] = (12, 6)
+
+print("Libraries imported successfully!")</code></pre>
+</div>
+<div class="cell cell-markdown">
+<h2>2. Load and Explore the Dataset</div>
+<div class="cell cell-code">
+<pre><code># Load the dataset
+# NOTE: Update the path to where you've saved the dataset
+df = pd.read_csv('dataset.csv')
+
+print(f"Dataset shape: {df.shape}")
+print(f"\nNumber of rows: {df.shape[0]:,}")
+print(f"Number of columns: {df.shape[1]}")</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Display first few rows
+df.head(10)</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Get dataset information
+df.info()</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Statistical summary
+df.describe()</code></pre>
+</div>
+<div class="cell cell-markdown">
+<h2>3. Data Preprocessing</div>
+<div class="cell cell-code">
+<pre><code># Check for missing values
+print("Missing values per column:")
+print(df.isnull().sum())
+print(f"\nTotal missing values: {df.isnull().sum().sum()}")</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Select the features for modeling
+feature_columns = ['danceability', 'energy', 'valence', 'tempo', 'loudness', 'duration_ms', 'explicit']
+target_column = 'popularity'
+
+# Check if duration_min exists, if not create it from duration_ms
+if 'duration_min' not in df.columns and 'duration_ms' in df.columns:
+    df['duration_min'] = df['duration_ms'] / 60000
+    print("Created 'duration_min' from 'duration_ms'")
+
+# Update feature columns to use duration_min
+if 'duration_min' in df.columns:
+    feature_columns = ['danceability', 'energy', 'valence', 'tempo', 'loudness', 'duration_min', 'explicit']
+
+# Convert explicit to binary if it's boolean
+if df['explicit'].dtype == 'bool':
+    df['explicit'] = df['explicit'].astype(int)
+
+print(f"\nFeatures selected: {feature_columns}")
+print(f"Target variable: {target_column}")</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Create a clean dataset with only the required columns
+columns_needed = feature_columns + [target_column]
+df_clean = df[columns_needed].copy()
+
+# Remove rows with missing values in selected columns
+df_clean = df_clean.dropna()
+
+print(f"Clean dataset shape: {df_clean.shape}")
+print(f"Rows removed: {df.shape[0] - df_clean.shape[0]:,}")</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Check for duplicates
+duplicates = df_clean.duplicated().sum()
+print(f"Number of duplicate rows: {duplicates}")
+
+if duplicates > 0:
+    df_clean = df_clean.drop_duplicates()
+    print(f"Duplicates removed. New shape: {df_clean.shape}")</code></pre>
+</div>
+<div class="cell cell-markdown">
+<h2>4. Exploratory Data Analysis (EDA)</div>
+<div class="cell cell-code">
+<pre><code># Distribution of the target variable (Popularity)
+plt.figure(figsize=(14, 5))
+
+plt.subplot(1, 2, 1)
+plt.hist(df_clean['popularity'], bins=50, edgecolor='black', color='skyblue')
+plt.xlabel('Popularity')
+plt.ylabel('Frequency')
+plt.title('Distribution of Track Popularity')
+plt.grid(alpha=0.3)
+
+plt.subplot(1, 2, 2)
+plt.boxplot(df_clean['popularity'], vert=True)
+plt.ylabel('Popularity')
+plt.title('Boxplot of Track Popularity')
+plt.grid(alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+
+print(f"Popularity Statistics:")
+print(df_clean['popularity'].describe())</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Distribution of features
+fig, axes = plt.subplots(3, 3, figsize=(16, 12))
+axes = axes.ravel()
+
+for idx, col in enumerate(feature_columns):
+    axes[idx].hist(df_clean[col], bins=30, edgecolor='black', color='coral', alpha=0.7)
+    axes[idx].set_xlabel(col.replace('_', ' ').title())
+    axes[idx].set_ylabel('Frequency')
+    axes[idx].set_title(f'Distribution of {col.replace("_", " ").title()}')
+    axes[idx].grid(alpha=0.3)
+
+# Hide extra subplots if any
+for idx in range(len(feature_columns), len(axes)):
+    axes[idx].axis('off')
+
+plt.tight_layout()
+plt.show()</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Correlation matrix
+plt.figure(figsize=(12, 10))
+correlation_matrix = df_clean.corr()
+sns.heatmap(correlation_matrix, annot=True, fmt='.2f', cmap='coolwarm', 
+            square=True, linewidths=1, cbar_kws={"shrink": 0.8})
+plt.title('Correlation Matrix - Features and Target', fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+print("\nCorrelation with Popularity (sorted):")
+print(correlation_matrix['popularity'].sort_values(ascending=False))</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Scatter plots of features vs popularity
+fig, axes = plt.subplots(3, 3, figsize=(16, 12))
+axes = axes.ravel()
+
+for idx, col in enumerate(feature_columns):
+    axes[idx].scatter(df_clean[col], df_clean['popularity'], alpha=0.3, s=10)
+    axes[idx].set_xlabel(col.replace('_', ' ').title())
+    axes[idx].set_ylabel('Popularity')
+    axes[idx].set_title(f'{col.replace("_", " ").title()} vs Popularity')
+    axes[idx].grid(alpha=0.3)
+    
+    # Add trend line
+    z = np.polyfit(df_clean[col], df_clean['popularity'], 1)
+    p = np.poly1d(z)
+    axes[idx].plot(df_clean[col], p(df_clean[col]), "r--", alpha=0.8, linewidth=2)
+
+# Hide extra subplots
+for idx in range(len(feature_columns), len(axes)):
+    axes[idx].axis('off')
+
+plt.tight_layout()
+plt.show()</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Pairplot for key features (sample for performance)
+if len(df_clean) > 5000:
+    sample_df = df_clean.sample(n=5000, random_state=42)
+    print("Using a sample of 5000 rows for pairplot visualization")
+else:
+    sample_df = df_clean
+
+# Select a subset of features for pairplot
+key_features = ['danceability', 'energy', 'valence', 'loudness', 'popularity']
+sns.pairplot(sample_df[key_features], diag_kind='kde', plot_kws={'alpha': 0.5, 's': 20})
+plt.suptitle('Pairplot of Key Features', y=1.02, fontsize=14, fontweight='bold')
+plt.show()</code></pre>
+</div>
+<div class="cell cell-markdown">
+<h2>5. Feature Engineering and Preparation</div>
+<div class="cell cell-code">
+<pre><code># Separate features and target
+X = df_clean[feature_columns]
+y = df_clean[target_column]
+
+print(f"Features shape: {X.shape}")
+print(f"Target shape: {y.shape}")
+print(f"\nFeature columns:")
+print(X.columns.tolist())</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Split the data into training and testing sets (80-20 split)
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+print(f"Training set size: {X_train.shape[0]:,} ({X_train.shape[0]/len(X)*100:.1f}%)")
+print(f"Testing set size: {X_test.shape[0]:,} ({X_test.shape[0]/len(X)*100:.1f}%)")</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Feature scaling
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+print("Features have been standardized (scaled)")
+print(f"\nScaling parameters:")
+print(f"Mean: {scaler.mean_}")
+print(f"Std: {scaler.scale_}")</code></pre>
+</div>
+<div class="cell cell-markdown">
+<h2>6. Linear Regression Model Building</div>
+<div class="cell cell-code">
+<pre><code># Create and train the Linear Regression model
+lr_model = LinearRegression()
+lr_model.fit(X_train_scaled, y_train)
+
+print("Linear Regression model trained successfully!")
+print(f"\nModel Intercept: {lr_model.intercept_:.4f}")
+print(f"\nModel Coefficients:")
+for feature, coef in zip(feature_columns, lr_model.coef_):
+    print(f"  {feature:15s}: {coef:8.4f}")</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Visualize feature importance (coefficients)
+plt.figure(figsize=(12, 6))
+coef_df = pd.DataFrame({
+    'Feature': feature_columns,
+    'Coefficient': lr_model.coef_
+}).sort_values('Coefficient', key=abs, ascending=False)
+
+colors = ['green' if x > 0 else 'red' for x in coef_df['Coefficient']]
+plt.barh(coef_df['Feature'], coef_df['Coefficient'], color=colors, alpha=0.7)
+plt.xlabel('Coefficient Value', fontsize=12)
+plt.ylabel('Features', fontsize=12)
+plt.title('Feature Importance (Linear Regression Coefficients)', fontsize=14, fontweight='bold')
+plt.axvline(x=0, color='black', linestyle='--', linewidth=1)
+plt.grid(alpha=0.3, axis='x')
+plt.tight_layout()
+plt.show()</code></pre>
+</div>
+<div class="cell cell-markdown">
+<h2>7. Model Predictions</div>
+<div class="cell cell-code">
+<pre><code># Make predictions on training and testing sets
+y_train_pred = lr_model.predict(X_train_scaled)
+y_test_pred = lr_model.predict(X_test_scaled)
+
+print("Predictions generated successfully!")
+print(f"\nSample predictions (first 10 test samples):")
+comparison_df = pd.DataFrame({
+    'Actual': y_test.values[:10],
+    'Predicted': y_test_pred[:10],
+    'Difference': y_test.values[:10] - y_test_pred[:10]
+}).round(2)
+print(comparison_df)</code></pre>
+</div>
+<div class="cell cell-markdown">
+<h2>8. Model Validation and Evaluation</div>
+<div class="cell cell-code">
+<pre><code># Calculate evaluation metrics
+# Training set metrics
+train_r2 = r2_score(y_train, y_train_pred)
+train_mse = mean_squared_error(y_train, y_train_pred)
+train_rmse = np.sqrt(train_mse)
+train_mae = mean_absolute_error(y_train, y_train_pred)
+
+# Testing set metrics
+test_r2 = r2_score(y_test, y_test_pred)
+test_mse = mean_squared_error(y_test, y_test_pred)
+test_rmse = np.sqrt(test_mse)
+test_mae = mean_absolute_error(y_test, y_test_pred)
+
+# Display metrics
+print("="*60)
+print("MODEL PERFORMANCE METRICS")
+print("="*60)
+print(f"\n{'Metric':<25} {'Training Set':<20} {'Testing Set':<20}")
+print("-"*60)
+print(f"{'R² Score':<25} {train_r2:<20.4f} {test_r2:<20.4f}")
+print(f"{'Mean Squared Error':<25} {train_mse:<20.4f} {test_mse:<20.4f}")
+print(f"{'Root Mean Squared Error':<25} {train_rmse:<20.4f} {test_rmse:<20.4f}")
+print(f"{'Mean Absolute Error':<25} {train_mae:<20.4f} {test_mae:<20.4f}")
+print("="*60)</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Cross-validation
+cv_scores = cross_val_score(lr_model, X_train_scaled, y_train, cv=5, 
+                            scoring='r2')
+
+print("\n5-Fold Cross-Validation Results:")
+print("-"*40)
+for i, score in enumerate(cv_scores, 1):
+    print(f"Fold {i}: R² = {score:.4f}")
+print("-"*40)
+print(f"Mean R² Score: {cv_scores.mean():.4f} (+/- {cv_scores.std() * 2:.4f})")
+print(f"Min R² Score: {cv_scores.min():.4f}")
+print(f"Max R² Score: {cv_scores.max():.4f}")</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Visualize cross-validation scores
+plt.figure(figsize=(10, 6))
+plt.bar(range(1, 6), cv_scores, color='steelblue', alpha=0.7, edgecolor='black')
+plt.axhline(y=cv_scores.mean(), color='red', linestyle='--', 
+            label=f'Mean: {cv_scores.mean():.4f}', linewidth=2)
+plt.xlabel('Fold', fontsize=12)
+plt.ylabel('R² Score', fontsize=12)
+plt.title('5-Fold Cross-Validation R² Scores', fontsize=14, fontweight='bold')
+plt.legend()
+plt.grid(alpha=0.3, axis='y')
+plt.tight_layout()
+plt.show()</code></pre>
+</div>
+<div class="cell cell-markdown">
+<h2>9. Residual Analysis</div>
+<div class="cell cell-code">
+<pre><code># Calculate residuals
+train_residuals = y_train - y_train_pred
+test_residuals = y_test - y_test_pred
+
+# Residual plots
+fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+
+# 1. Predicted vs Actual (Training)
+axes[0, 0].scatter(y_train_pred, y_train, alpha=0.3, s=10)
+axes[0, 0].plot([y_train.min(), y_train.max()], [y_train.min(), y_train.max()], 
+                'r--', lw=2, label='Perfect Prediction')
+axes[0, 0].set_xlabel('Predicted Popularity', fontsize=11)
+axes[0, 0].set_ylabel('Actual Popularity', fontsize=11)
+axes[0, 0].set_title('Training Set: Predicted vs Actual', fontsize=12, fontweight='bold')
+axes[0, 0].legend()
+axes[0, 0].grid(alpha=0.3)
+
+# 2. Predicted vs Actual (Testing)
+axes[0, 1].scatter(y_test_pred, y_test, alpha=0.3, s=10, color='orange')
+axes[0, 1].plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 
+                'r--', lw=2, label='Perfect Prediction')
+axes[0, 1].set_xlabel('Predicted Popularity', fontsize=11)
+axes[0, 1].set_ylabel('Actual Popularity', fontsize=11)
+axes[0, 1].set_title('Testing Set: Predicted vs Actual', fontsize=12, fontweight='bold')
+axes[0, 1].legend()
+axes[0, 1].grid(alpha=0.3)
+
+# 3. Residual plot (Training)
+axes[1, 0].scatter(y_train_pred, train_residuals, alpha=0.3, s=10)
+axes[1, 0].axhline(y=0, color='r', linestyle='--', lw=2)
+axes[1, 0].set_xlabel('Predicted Popularity', fontsize=11)
+axes[1, 0].set_ylabel('Residuals', fontsize=11)
+axes[1, 0].set_title('Training Set: Residual Plot', fontsize=12, fontweight='bold')
+axes[1, 0].grid(alpha=0.3)
+
+# 4. Residual plot (Testing)
+axes[1, 1].scatter(y_test_pred, test_residuals, alpha=0.3, s=10, color='orange')
+axes[1, 1].axhline(y=0, color='r', linestyle='--', lw=2)
+axes[1, 1].set_xlabel('Predicted Popularity', fontsize=11)
+axes[1, 1].set_ylabel('Residuals', fontsize=11)
+axes[1, 1].set_title('Testing Set: Residual Plot', fontsize=12, fontweight='bold')
+axes[1, 1].grid(alpha=0.3)
+
+plt.tight_layout()
+plt.show()</code></pre>
+</div>
+<div class="cell cell-code">
+<pre><code># Distribution of residuals
+fig, axes = plt.subplots(1, 2, figsize=(16, 5))
+
+# Training residuals
+axes[0].hist(train_residuals, bins=50, edgecolor='black', alpha=0.7, color='skyblue')
+axes[0].axvline(x=0, color='red', linestyle='--', linewidth=2, label='Zero Residual')
+axes[0].set_xlabel('Residuals', fontsize=11)
+axes[0].set_ylabel('Frequency', fontsize=11)
+axes[0].set_title('Training Set: Distribution of Residuals', fontsize=12, fontweight='bold')
+axes[0].legend()
+axes[0].grid(alpha=0.3)
+
+# Testing residuals
+axes[1].hist(test_residuals, bins=50, edgecolor='black', alpha=0.7, color='coral')
+axes[1].axvline(x=0, color='red', linestyle='--', linewidth=2, label='Zero Residual')
+axes[1].set_xlabel('Residuals', fontsize=11)
+axes[1].set_ylabel('Frequency', fontsize=11)
+axes[1].set_title('Testing Set: Distribution of Residuals', fontsize=12, fontweight='bold')
+axes[1].legend()
+axes[1].grid(alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+
+print(f"Training Residuals - Mean: {train_residuals.mean():.4f}, Std: {train_residuals.std():.4f}")
+print(f"Testing Residuals - Mean: {test_residuals.mean():.4f}, Std: {test_residuals.std():.4f}")</code></pre>
+</div>
+<div class="cell cell-markdown">
+<h2>10. Making Predictions on New Data</div>
+<div class="cell cell-code">
+<pre><code># Example: Create sample data for prediction
+sample_data = pd.DataFrame({
+    'danceability': [0.7, 0.5, 0.8],
+    'energy': [0.8, 0.6, 0.9],
+    'valence': [0.6, 0.4, 0.8],
+    'tempo': [120, 100, 140],
+    'loudness': [-5, -8, -4],
+    'duration_min': [3.5, 4.0, 2.8],
+    'explicit': [1, 0, 1]
+})
+
+print("Sample tracks for prediction:")
+print(sample_data)
+
+# Scale the sample data
+sample_data_scaled = scaler.transform(sample_data)
+
+# Make predictions
+sample_predictions = lr_model.predict(sample_data_scaled)
+
+# Display predictions
+sample_data['Predicted_Popularity'] = sample_predictions.round(2)
+print("\nPredicted popularity scores:")
+print(sample_data[['danceability', 'energy', 'valence', 'Predicted_Popularity']])</code></pre>
+</div>
+<div class="cell cell-markdown">
+<h2>11. Model Summary and Insights</div>
+<div class="cell cell-code">
+<pre><code>print("="*70)
+print("LINEAR REGRESSION MODEL SUMMARY")
+print("="*70)
+
+print(f"\n📊 Dataset Information:")
+print(f"   Total samples: {len(df_clean):,}")
+print(f"   Training samples: {len(X_train):,}")
+print(f"   Testing samples: {len(X_test):,}")
+print(f"   Number of features: {len(feature_columns)}")
+
+print(f"\n📈 Model Performance:")
+print(f"   Training R² Score: {train_r2:.4f}")
+print(f"   Testing R² Score: {test_r2:.4f}")
+print(f"   Testing RMSE: {test_rmse:.4f}")
+print(f"   Testing MAE: {test_mae:.4f}")
+
+print(f"\n🔍 Cross-Validation:")
+print(f"   Mean CV R² Score: {cv_scores.mean():.4f} (+/- {cv_scores.std() * 2:.4f})")
+
+print(f"\n🎯 Top 3 Most Important Features (by absolute coefficient):")
+top_features = coef_df.head(3)
+for idx, row in top_features.iterrows():
+    print(f"   {row['Feature']:15s}: {row['Coefficient']:8.4f}")
+
+print(f"\n💡 Key Insights:")
+if test_r2 > 0.5:
+    print(f"   ✓ The model explains {test_r2*100:.1f}% of the variance in track popularity")
+else:
+    print(f"   ⚠ The model explains only {test_r2*100:.1f}% of the variance - moderate predictive power")
+
+if abs(train_r2 - test_r2) < 0.05:
+    print(f"   ✓ Good generalization - minimal overfitting detected")
+else:
+    print(f"   ⚠ Some overfitting detected (train-test R² gap: {abs(train_r2-test_r2):.4f})")
+
+print(f"   ✓ Average prediction error: {test_mae:.2f} popularity points")
+
+print("\n" + "="*70)</code></pre>
+</div>
+<div class="cell cell-markdown">
+<h2>12. Save Model and Results</div>
+<div class="cell cell-code">
+<pre><code># Save predictions to CSV
+results_df = pd.DataFrame({
+    'Actual_Popularity': y_test.values,
+    'Predicted_Popularity': y_test_pred,
+    'Residual': test_residuals
+})
+
+results_df.to_csv('spotify_predictions.csv', index=False)
+print("✓ Predictions saved to 'spotify_predictions.csv'")
+
+# Save model summary
+with open('model_summary.txt', 'w') as f:
+    f.write("Spotify Linear Regression Model Summary\n")
+    f.write("="*50 + "\n\n")
+    f.write(f"Training R² Score: {train_r2:.4f}\n")
+    f.write(f"Testing R² Score: {test_r2:.4f}\n")
+    f.write(f"Testing RMSE: {test_rmse:.4f}\n")
+    f.write(f"Testing MAE: {test_mae:.4f}\n\n")
+    f.write("Feature Coefficients:\n")
+    for feature, coef in zip(feature_columns, lr_model.coef_):
+        f.write(f"  {feature:15s}: {coef:8.4f}\n")
+
+print("✓ Model summary saved to 'model_summary.txt'")</code></pre>
+</div>
+<div class="cell cell-markdown">
+<h2>Conclusion</h2><br><br>This notebook has successfully:
+1. ✅ Loaded and explored the Spotify tracks dataset
+2. ✅ Performed comprehensive exploratory data analysis
+3. ✅ Built a linear regression model using specified audio features
+4. ✅ Validated the model using multiple metrics and cross-validation
+5. ✅ Made predictions and analyzed residuals
+6. ✅ Identified key features influencing track popularity<br><br>The model provides insights into how audio features and metadata relate to track popularity on Spotify.</div>
+
+    </div>
+    <footer style="text-align: center; margin-top: 30px; padding: 20px; color: #7f8c8d;">
+        <p>Generated from Jupyter Notebook | Spotify Tracks Linear Regression Analysis</p>
+        <p>© 2026 | Data Science Project</p>
+    </footer>
+</body>
+</html>
