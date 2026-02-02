@@ -1,0 +1,16 @@
+Spotify Linear Regression Model Summary
+==================================================
+
+Training R² Score: 0.0245
+Testing R² Score: 0.0262
+Testing RMSE: 19.6577
+Testing MAE: 16.2857
+
+Feature Coefficients:
+  danceability   :   1.3324
+  energy         :  -2.5732
+  valence        :  -0.9138
+  tempo          :   0.0331
+  loudness       :   3.5104
+  duration_min   :  -0.7640
+  explicit       :   0.8899
